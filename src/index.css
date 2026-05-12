@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", serif;
+
+  --color-brand-paper: #f5f2ed;
+  --color-brand-ink: #1a1a1a;
+  --color-brand-gold: #c5a059;
+  --color-brand-rose: #f8e1e7;
+  --color-brand-nude: #f2e6e1;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-paper text-brand-ink font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+}
+
+.luxury-card {
+  @apply bg-white rounded-3xl transition-all duration-500 hover:shadow-xl hover:shadow-brand-ink/5;
+}
+
+.luxury-button {
+  @apply bg-brand-ink text-brand-paper px-6 py-3 rounded-full font-medium tracking-wide transition-all hover:bg-brand-ink/90 active:scale-95;
+}
+
+.luxury-button-outline {
+  @apply border border-brand-ink/20 px-6 py-3 rounded-full font-medium tracking-wide transition-all hover:bg-brand-ink hover:text-brand-paper active:scale-95;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

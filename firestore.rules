@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // common helpers
+    function isSignedIn() { return request.auth != null; }
+    
+    // Robust isAdmin check:
+    // 1. Check if email is the master admin (hardcoded safety)
+    // 2. Or check if user document exists and has admin role + active status
+    function isAdmin() { 
+      return isSignedIn() && (
+        (request.auth.token.email == 'svpdrogarias@gmail.com' && request.auth.token.email_verified == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true)
+      );
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // 1. Settings & Stores - Public read for branding, write for admin
+    match /settings/{docId} {
+      allow read: if true;
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        docId == 'store' && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['nextOrderNumber'])
+      );
+      allow create, delete: if isAdmin();
+    }
+
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    match /stores/{storeId} {
+      allow read: if true; 
+      allow write: if isAdmin();
+    }
+
+    // 2. Catalogue (Categories, Products, Banners, Coupons, DeliveryAreas)
+    // Allow public read for better UX, but only admin can modify
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /deliveryAreas/{areaId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 3. Orders - Personal read/create, admin read/update/delete
+    match /orders/{orderId} {
+      allow create: if isSignedIn() && isValidOrder(incoming()) && incoming().customerId == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    // 4. Users - Personal read/update, admin everything
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Allow creation for self (registration)
+      allow create: if isSignedIn() && request.auth.uid == userId && (
+        // Master admin can be admin
+        (request.auth.token.email == 'svpdrogarias@gmail.com' && incoming().role == 'admin') ||
+        // Others are customers by default
+        incoming().role == 'customer'
+      );
+      
+      // Allow personal updates (except role/active)
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && 
+         incoming().role == existing().role && 
+         incoming().active == existing().active) ||
+        isAdmin()
+      );
+      
+      allow delete: if isAdmin();
+    }
+
+    function isValidOrder(data) {
+      return data.customerName is string && data.customerName.size() <= 100 &&
+             data.customerPhone is string && data.customerPhone.size() <= 20 &&
+             data.deliveryType in ['delivery', 'pickup', 'DELIVERY', 'PICKUP'] &&
+             data.items is list && data.items.size() > 0 &&
+             data.total is number && data.total >= 0 &&
+             data.paymentMethod in ['pix', 'cartao', 'dinheiro', 'a_combinar'] &&
+             (data.createdAt == request.time || data.createdAt is timestamp);
+    }
+  }
+}
