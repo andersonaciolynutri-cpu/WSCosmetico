@@ -10,11 +10,11 @@ import {
 } from 'lucide-react';
 
 const CATEGORIES: { id: CategoryID; label: string; icon: any }[] = [
-  { id: 'Make', label: 'Make', icon: Palette },
-  { id: 'Cabelo', label: 'Cabelo', icon: Sparkles },
-  { id: 'Higiene Pessoal', label: 'Higiene', icon: Bath },
-  { id: 'Beleza', label: 'Beleza', icon: Flower2 },
-  { id: 'Bebê', label: 'Bebê', icon: Baby },
+  { id: 'Cabelos', label: 'Cabelos', icon: Sparkles },
+  { id: 'Higiene e Cuidados Pessoais', label: 'Higiene', icon: Bath },
+  { id: 'Infantil e Bebê', label: 'Infantil', icon: Baby },
+  { id: 'Beleza e Corpo', label: 'Beleza', icon: Flower2 },
+  { id: 'Maquiagem', label: 'Maquiagem', icon: Palette },
 ];
 
 interface CategoryFilterProps {

@@ -38,7 +38,7 @@ export async function getCroppedImg(
   pixelCrop: { x: number; y: number; width: number; height: number },
   rotation = 0,
   flip = { horizontal: false, vertical: false },
-  outputType = 'image/jpeg'
+  outputType = 'image/webp'
 ): Promise<string> {
   const image = await createImage(imageSrc);
   const canvas = document.createElement('canvas');
@@ -103,7 +103,7 @@ export async function getCroppedImg(
 export async function compressDataUrl(
   dataUrl: string,
   maxSizeMB = 2,
-  outputType = 'image/jpeg'
+  outputType = 'image/webp'
 ): Promise<string> {
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
   let currentSize = Math.round((dataUrl.length * 3) / 4);

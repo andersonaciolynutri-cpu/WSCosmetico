@@ -61,28 +61,75 @@ const calculateSize = (originalWidth: number, originalHeight: number, maxWidth: 
 };
 
 /**
- * Comprime uma imagem para que fique abaixo do tamanho máximo em MB.
+ * Converte um DataURL para Blob.
+ */
+export const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
+  const res = await fetch(dataUrl);
+  return res.blob();
+};
+
+/**
+ * Processa a imagem para ser quadrada (1024x1024) sem distorcer, centralizada.
+ */
+export async function processLogoToSquare(dataUrlOrFile: string | File, size = 1024): Promise<string> {
+  let src: string;
+  if (dataUrlOrFile instanceof File) {
+    src = URL.createObjectURL(dataUrlOrFile);
+  } else {
+    src = dataUrlOrFile;
+  }
+
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Não foi possível processar a imagem.'));
+        return;
+      }
+
+      // Limpa canvas (preserva transparência)
+      ctx.clearRect(0, 0, size, size);
+
+      const scale = Math.min(size / img.width, size / img.height);
+      const width = img.width * scale;
+      const height = img.height * scale;
+      const x = (size - width) / 2;
+      const y = (size - height) / 2;
+
+      ctx.drawImage(img, x, y, width, height);
+      
+      const result = canvas.toDataURL('image/webp', 0.9);
+      if (dataUrlOrFile instanceof File) {
+        URL.revokeObjectURL(src);
+      }
+      resolve(result);
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+/**
+ * Comprime uma imagem para que fique abaixo do tamanho máximo em MB e converte para WebP.
  */
 export async function compressImageToMaxSize(file: File, maxSizeMB = 2): Promise<string> {
   const typeError = validateImageType(file);
   if (typeError) throw new Error(typeError);
 
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
-
-  // Se já estiver abaixo do limite, retorna convertida para DataURL diretamente
-  if (file.size <= maxSizeBytes) {
-    return fileToDataUrl(file);
-  }
-
   const image = await loadImage(file);
 
-  let maxWidth = 1200;
-  let maxHeight = 1200;
-  let quality = 0.9;
+  let maxWidth = 1600;
+  let maxHeight = 1600;
+  let quality = 0.8;
   let dataUrl = "";
 
   // Tenta comprimir em até 10 iterações
-  for (let attempt = 0; attempt < 10; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     const { width, height } = calculateSize(image.width, image.height, maxWidth, maxHeight);
 
     const canvas = document.createElement("canvas");
@@ -94,25 +141,24 @@ export async function compressImageToMaxSize(file: File, maxSizeMB = 2): Promise
 
     ctx.drawImage(image, 0, 0, width, height);
 
-    // Converte para JPEG para melhor taxa de compressão
-    dataUrl = canvas.toDataURL("image/jpeg", quality);
+    // Converte para WebP (fallback para JPEG se não suportado)
+    dataUrl = canvas.toDataURL("image/webp", quality);
+    if (!dataUrl.startsWith("data:image/webp")) {
+      dataUrl = canvas.toDataURL("image/jpeg", quality);
+    }
 
     // Estimativa de tamanho em bytes da DataURL
     const sizeInBytes = Math.round((dataUrl.length * 3) / 4);
 
-    if (sizeInBytes <= maxSizeBytes) {
+    if (sizeInBytes <= maxSizeBytes && attempt >= 0) {
       URL.revokeObjectURL(image.src);
       return dataUrl;
     }
 
     // Se ainda for muito grande, reduz qualidade ou dimensões
-    if (quality > 0.6) {
-      quality -= 0.1;
-    } else {
-      maxWidth = Math.round(maxWidth * 0.85);
-      maxHeight = Math.round(maxHeight * 0.85);
-      quality = 0.85;
-    }
+    quality -= 0.15;
+    maxWidth = Math.round(maxWidth * 0.8);
+    maxHeight = Math.round(maxHeight * 0.8);
   }
 
   URL.revokeObjectURL(image.src);

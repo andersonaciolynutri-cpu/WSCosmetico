@@ -41,3 +41,11 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.logo {
+  @apply w-full h-full object-contain p-1;
+}
+
+.product-image {
+  @apply w-full h-full object-contain p-4 transition-transform duration-700;
+}

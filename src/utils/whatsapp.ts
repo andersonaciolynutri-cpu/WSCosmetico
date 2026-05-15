@@ -1,4 +1,4 @@
-import { CartItem, CustomerData, StoreSettings } from '../types';
+import { Order, StoreSettings } from '../types';
 
 export const cleanPhoneNumber = (phone: string): string => {
   let cleaned = phone.replace(/\D/g, '');
@@ -8,36 +8,24 @@ export const cleanPhoneNumber = (phone: string): string => {
   return cleaned;
 };
 
-export const formatWhatsAppMessage = (items: CartItem[], total: number, customer: CustomerData, settings: StoreSettings): string => {
-  const itemsList = items
-    .map(item => {
-      const itemTotal = (item.price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      const unitPrice = item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      return `${item.quantity}x ${item.name} - ${item.brand} - ${item.category}\nValor unitário: ${unitPrice}\nTotal: ${itemTotal}`;
-    })
-    .join('\n\n');
+export const formatWhatsAppMessage = (order: Order, settings: StoreSettings): string => {
+  const totalFormatted = order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  const totalFormatted = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  return `Olá, segue um novo pedido da ${settings.companyName}.
 
-  return `Olá, gostaria de fazer um pedido na ${settings.companyName}.
+*Nº do pedido:* ${order.order_number}
+*Cliente:* ${order.customer_name}
+*Telefone:* ${order.customer_phone}
+*Endereço:* ${order.customer_address || 'Não informado'}
+*Forma de Pagamento:* ${order.payment_method || 'Não informada'}${order.payment_method === 'Dinheiro' && order.change_for ? ` (Troco para R$ ${order.change_for.toFixed(2)})` : ''}
+*Total:* ${totalFormatted}
 
-*Dados do cliente:*
-Nome: ${customer.name}
-${customer.storeName ? `Loja: ${customer.storeName}` : ''}
-${customer.document ? `CPF/CNPJ: ${customer.document}` : ''}
-Telefone: ${customer.phone}
-${customer.address ? `Endereço: ${customer.address}` : ''}
-
-*Produtos:*
-${itemsList}
-
-*Total geral: ${totalFormatted}*
-
-${customer.observation ? `*Observações:* ${customer.observation}` : ''}`;
+O PDF do pedido foi gerado.
+Por favor, anexe o arquivo PDF nesta conversa para conferência.`;
 };
 
-export const openWhatsApp = (items: CartItem[], total: number, customer: CustomerData, settings: StoreSettings) => {
-  const message = formatWhatsAppMessage(items, total, customer, settings);
+export const openWhatsApp = (order: Order, settings: StoreSettings) => {
+  const message = formatWhatsAppMessage(order, settings);
   const encodedMessage = encodeURIComponent(message);
   const cleanPhone = cleanPhoneNumber(settings.whatsappNumber);
   window.open(`https://wa.me/${cleanPhone}?text=${encodedMessage}`, '_blank');

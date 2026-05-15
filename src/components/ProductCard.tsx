@@ -13,11 +13,12 @@ interface ProductCardProps {
 export default function ProductCard({ product, quantity, onUpdateQuantity }: ProductCardProps) {
   return (
     <div className="bg-white rounded-[2.5rem] p-4 shadow-sm border border-brand-ink/5 flex flex-col group hover:shadow-xl hover:shadow-brand-ink/5 transition-all duration-500">
-      <div className="aspect-square rounded-[2rem] overflow-hidden mb-4 bg-brand-paper relative">
+      <div className="aspect-square rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden mb-3 sm:mb-4 bg-white relative border border-brand-ink/5">
         <img 
-          src={product.imageDataUrl || product.imageUrl || '/placeholder-product.png'} 
+          src={product.image_url || '/placeholder-product.png'} 
           alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+          className="product-image group-hover:scale-105"
+          loading="lazy"
           onError={(e) => {
             e.currentTarget.onerror = null;
             e.currentTarget.src = 'https://placehold.co/400x400?text=' + product.name;

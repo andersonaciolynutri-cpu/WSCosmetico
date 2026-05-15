@@ -21,7 +21,7 @@ export default function ImageEditorModal({
   onSave,
   aspect = 1 / 1,
   title = 'Ajustar Imagem',
-  outputType = 'image/jpeg'
+  outputType = 'image/webp'
 }: ImageEditorModalProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);

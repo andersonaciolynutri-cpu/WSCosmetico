@@ -1,41 +1,52 @@
-const ADMIN_SESSION_KEY = 'ws_admin_session';
-const ADMIN_PASSWORD_KEY = 'ws_admin_password';
-const DEFAULT_ADMIN_PASSWORD = 'WS@2026';
+import { supabase } from '../lib/supabaseClient';
 
 export const adminAuth = {
-  getAdminPassword(): string {
-    return localStorage.getItem(ADMIN_PASSWORD_KEY) || DEFAULT_ADMIN_PASSWORD;
+  async getSession() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) return null;
+    return session;
   },
 
-  validateAdminPassword(password: string): boolean {
-    return password === this.getAdminPassword();
+  async getUser() {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) return null;
+    return user;
   },
 
-  updateAdminPassword(currentPassword: string, newPassword: string, confirmPassword: string) {
-    if (currentPassword !== this.getAdminPassword()) {
-      throw new Error('Senha atual incorreta.');
+  async isAdmin(): Promise<boolean> {
+    const user = await this.getUser();
+    if (!user) return false;
+
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('user_id, role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+
+    if (error || !data) return false;
+    return true;
+  },
+
+  async login(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+    
+    if (error) throw error;
+    
+    // Verificar se o usuário está na tabela admin_users
+    const isUserAdmin = await this.isAdmin();
+    if (!isUserAdmin) {
+      await this.logout();
+      throw new Error('Usuário sem permissão de administrador.');
     }
 
-    if (!newPassword || newPassword.length < 6) {
-      throw new Error('A nova senha precisa ter no mínimo 6 caracteres.');
-    }
-
-    if (newPassword !== confirmPassword) {
-      throw new Error('As senhas não coincidem.');
-    }
-
-    localStorage.setItem(ADMIN_PASSWORD_KEY, newPassword);
+    return data;
   },
 
-  isAdminLoggedIn(): boolean {
-    return localStorage.getItem(ADMIN_SESSION_KEY) === 'true';
-  },
-
-  loginAdmin() {
-    localStorage.setItem(ADMIN_SESSION_KEY, 'true');
-  },
-
-  logoutAdmin() {
-    localStorage.removeItem(ADMIN_SESSION_KEY);
+  async logout() {
+    await supabase.auth.signOut();
   }
 };
