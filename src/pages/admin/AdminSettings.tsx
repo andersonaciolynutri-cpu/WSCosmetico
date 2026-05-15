@@ -116,8 +116,8 @@ export default function AdminSettings() {
     );
   }
 
-  const currentSettings = settings || { company_name: '', whatsapp_number: '' };
-  const currentLogo = logoPreview || currentSettings.logo_url || '/logo.png';
+  const currentSettings = settings || { company_name: '', whatsapp_number: '', logo_url: '' };
+  const currentLogo = logoPreview || (currentSettings as AppSettings).logo_url || '/logo.png';
 
   return (
     <div className="space-y-6 sm:space-y-10">

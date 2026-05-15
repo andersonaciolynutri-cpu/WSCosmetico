@@ -14,6 +14,7 @@ import { adminAuth } from '../../utils/adminAuth';
 import { settingsService } from '../../services/settingsService';
 import { cn } from '../../lib/utils';
 import { AppSettings } from '../../types';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -159,7 +160,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-12 overflow-y-auto">
         <div className="max-w-5xl mx-auto">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </main>
     </div>
