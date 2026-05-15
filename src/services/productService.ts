@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 import { Product } from '../types';
+import { supabaseStorageService } from './supabaseStorageService';
 
 export const productService = {
   async getActiveProducts() {
@@ -21,6 +22,17 @@ export const productService = {
 
     if (error) throw error;
     return data as Product[];
+  },
+
+  async getProductById(id: string) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return data as Product;
   },
 
   async createProduct(product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) {
@@ -47,6 +59,21 @@ export const productService = {
   },
 
   async deleteProduct(id: string) {
+    // 1. Buscar o produto para obter o image_path
+    const { data: product } = await supabase
+      .from('products')
+      .select('image_path')
+      .eq('id', id)
+      .single();
+
+    // 2. Se houver imagem, tentar excluir do storage
+    if (product?.image_path) {
+      await supabaseStorageService.deleteProductImage(product.image_path).catch(err => {
+        console.warn('Erro ao excluir imagem durante a remoção do produto:', err);
+      });
+    }
+
+    // 3. Excluir o registro da tabela
     const { error } = await supabase
       .from('products')
       .delete()

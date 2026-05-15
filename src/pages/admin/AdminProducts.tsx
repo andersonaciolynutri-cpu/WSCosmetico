@@ -109,77 +109,95 @@ export default function AdminProducts() {
       const brand = formData.get('brand') as string;
       const category = formData.get('category') as string;
       const price = Number(formData.get('price'));
-      const active = formData.get('active') === 'on';
-      const directUrl = formData.get('image_url') as string;
+      const active = formData.get('active') === 'on' || formData.get('active') === 'true';
+      const directUrl = (formData.get('image_url') as string)?.trim();
 
-      const productData: Partial<Product> = {
+      const basePayload: Partial<Product> = {
         name,
         brand,
         category,
         price,
-        active,
-        image_url: directUrl || (imagePreview?.startsWith('data:') ? undefined : imagePreview) || undefined
+        active
       };
 
-      let savedProduct: Product;
-
       if (editingProduct) {
-        // If image was changed (it's a data URL now)
-        if (imagePreview && imagePreview.startsWith('data:')) {
-          const blob = await fetch(imagePreview).then(r => r.blob());
-          const file = new File([blob], 'product-image.webp', { type: 'image/webp' });
-          
-          // Delete old image if it exists
-          if (editingProduct.image_path) {
-            await supabaseStorageService.deleteProductImage(editingProduct.image_path).catch(console.error);
-          }
+        // --- EDITAR PRODUTO ---
+        let finalPayload = { ...basePayload };
+        let oldImagePathToCleanup: string | null = null;
 
-          const uploadRes = await supabaseStorageService.uploadProductImage(file, editingProduct.id, productData.name!);
-          productData.image_url = uploadRes.url;
-          productData.image_path = uploadRes.path;
-        } else if (!imagePreview) {
-          // Image was removed
-          productData.image_url = undefined;
-          if (editingProduct.image_path) {
-            await supabaseStorageService.deleteProductImage(editingProduct.image_path).catch(console.error);
-            productData.image_path = undefined;
+        // Caso 1: Usuário informou uma URL direta nova
+        if (directUrl && directUrl !== editingProduct.image_url) {
+          finalPayload.image_url = directUrl;
+          finalPayload.image_path = undefined; // Limpa o path se era do storage
+          oldImagePathToCleanup = editingProduct.image_path || null;
+        } 
+        // Caso 2: Usuário fez upload de nova foto (dataURL no preview)
+        else if (imagePreview && imagePreview.startsWith('data:')) {
+          try {
+            const response = await fetch(imagePreview);
+            const blob = await response.blob();
+            const file = new File([blob], 'product.webp', { type: 'image/webp' });
+            
+            const uploadRes = await supabaseStorageService.uploadProductImage(file, editingProduct.id, name);
+            finalPayload.image_url = uploadRes.url;
+            finalPayload.image_path = uploadRes.path;
+            oldImagePathToCleanup = editingProduct.image_path || null;
+          } catch (uploadError) {
+            console.error('Erro no upload da imagem:', uploadError);
+            alert('Erro ao fazer upload da imagem. O produto será salvo sem a nova foto.');
           }
-        } else if (imagePreview !== editingProduct.image_url) {
-          // It's a direct URL change (not a data URL, but different from before)
-          if (editingProduct.image_path) {
-            await supabaseStorageService.deleteProductImage(editingProduct.image_path).catch(console.error);
-            productData.image_path = undefined;
-          }
-        } else {
-          // Image didn't change (still the same URL or image_path)
-          productData.image_path = editingProduct.image_path;
+        }
+        // Caso 3: Imagem foi removida
+        else if (!imagePreview && !directUrl && editingProduct.image_url) {
+          finalPayload.image_url = undefined;
+          finalPayload.image_path = undefined;
+          oldImagePathToCleanup = editingProduct.image_path || null;
         }
 
-        savedProduct = await productService.updateProduct(editingProduct.id, productData);
-      } else {
-        // New Product
-        savedProduct = await productService.createProduct(productData as Omit<Product, 'id' | 'created_at' | 'updated_at'>);
+        // Salva no Banco
+        await productService.updateProduct(editingProduct.id, finalPayload);
 
-        // Then upload image if exists and is a DataURL
-        if (imagePreview && imagePreview.startsWith('data:')) {
-          const blob = await fetch(imagePreview).then(r => r.blob());
-          const file = new File([blob], 'product-image.webp', { type: 'image/webp' });
-          const uploadRes = await supabaseStorageService.uploadProductImage(file, savedProduct.id, productData.name!);
-          
-          savedProduct = await productService.updateProduct(savedProduct.id, {
-            image_url: uploadRes.url,
-            image_path: uploadRes.path
+        // Se trocou de imagem e tinha uma antiga no storage, tenta apagar
+        if (oldImagePathToCleanup && oldImagePathToCleanup !== finalPayload.image_path) {
+          await supabaseStorageService.deleteProductImage(oldImagePathToCleanup).catch(err => {
+            console.warn('Erro ao limpar imagem antiga do storage:', err);
           });
+        }
+      } else {
+        // --- NOVO PRODUTO ---
+        // 1. Cria primeiro para ter o ID
+        let newProduct = await productService.createProduct(basePayload as any);
+
+        // 2. Se tiver imagem, faz o upload ou define a URL
+        if (directUrl) {
+          await productService.updateProduct(newProduct.id, { image_url: directUrl });
+        } else if (imagePreview && imagePreview.startsWith('data:')) {
+          try {
+            const response = await fetch(imagePreview);
+            const blob = await response.blob();
+            const file = new File([blob], 'product.webp', { type: 'image/webp' });
+            
+            const uploadRes = await supabaseStorageService.uploadProductImage(file, newProduct.id, name);
+            await productService.updateProduct(newProduct.id, { 
+              image_url: uploadRes.url, 
+              image_path: uploadRes.path 
+            });
+          } catch (uploadError) {
+            console.error('Erro no upload da foto do novo produto:', uploadError);
+          }
         }
       }
 
       await loadProducts();
       setIsModalOpen(false);
       setEditingProduct(null);
+      setSuccessMessage(editingProduct ? "Produto atualizado com sucesso!" : "Produto criado com sucesso!");
       window.dispatchEvent(new Event("ws_products_updated"));
+      
+      setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
-      alert('Erro ao salvar produto. Verifique sua conexão.');
+      alert('Erro inesperado ao salvar produto. Verifique o console para mais detalhes.');
     } finally {
       setIsSaving(false);
     }
@@ -189,9 +207,7 @@ export default function AdminProducts() {
     if (!productToDelete) return;
 
     try {
-      if (productToDelete.image_path) {
-        await supabaseStorageService.deleteProductImage(productToDelete.image_path).catch(console.error);
-      }
+      // O productService.deleteProduct já cuida de remover a imagem do storage
       await productService.deleteProduct(productToDelete.id);
       
       await loadProducts();
@@ -204,8 +220,8 @@ export default function AdminProducts() {
         setSuccessMessage("");
       }, 3000);
     } catch (error) {
-      console.error('Erro ao excluir produto:', error);
-      alert('Erro ao excluir produto.');
+      console.error('Erro detalhado ao excluir produto:', error);
+      alert('Não foi possível excluir o produto. Erro: ' + (error instanceof Error ? error.message : 'Erro desconhecido'));
     }
   };
 

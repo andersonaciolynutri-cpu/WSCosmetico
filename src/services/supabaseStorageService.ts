@@ -43,11 +43,21 @@ export const supabaseStorageService = {
   },
 
   async deleteProductImage(path: string) {
-    const { error } = await supabase.storage
-      .from('product-images')
-      .remove([path]);
+    if (!path) return false;
+    try {
+      const { error } = await supabase.storage
+        .from('product-images')
+        .remove([path]);
 
-    if (error) throw error;
+      if (error) {
+        console.warn('Erro ao remover imagem do storage:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.warn('Erro inesperado ao remover imagem do storage:', error);
+      return false;
+    }
   },
 
   async uploadLogo(file: File) {
